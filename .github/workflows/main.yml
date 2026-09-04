@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
+      - nishant
   workflow_dispatch:
 
 concurrency:
-  group: ftp-deploy-main
+  group: ftp-deploy-${{ github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -25,7 +26,9 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.2"
+          # Must satisfy composer.json ("php": "^8.3"); the hosting account
+          # needs to run 8.3+ as well or the app will 500.
+          php-version: "8.3"
           coverage: none
           tools: composer
 
@@ -45,6 +48,25 @@ jobs:
           find vendor -type d \( -iname test -o -iname tests -o -iname docs -o -iname documentation \) -prune -exec rm -rf {} + || true
           find vendor -type f \( -name '*.md' -o -name 'phpunit.xml*' -o -name '.phpunit.result.cache' \) -delete || true
 
+      # Laravel's runtime directories are tracked in git by a .gitignore file
+      # alone, and the FTP action only creates directories that contain at
+      # least one syncable file. Without this the app cannot compile Blade
+      # views or write logs on the server, which surfaces as a blank HTTP 500.
+      - name: Ensure writable runtime directories are shipped
+        run: |
+          for dir in \
+            bootstrap/cache \
+            storage/app/public \
+            storage/app/private \
+            storage/framework/cache/data \
+            storage/framework/sessions \
+            storage/framework/views \
+            storage/logs
+          do
+            mkdir -p "$dir"
+            touch "$dir/.keep"
+          done
+
       - name: Sync files
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
@@ -54,13 +76,15 @@ jobs:
           log-level: minimal
           timeout: 60000
           exclude: |
-            **/.git*
-            **/.git*/**
+            .git/**
+            .github/**
+            .gitattributes
+            .editorconfig
             **/node_modules/**
             **/.env
             **/.env.*
-            **/.github/**
             **/tests/**
+            phpunit.xml
             **/writable/logs/**
             **/writable/session/**
             **/writable/cache/**

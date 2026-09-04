@@ -1,0 +1,72 @@
+name: Deploy website
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ftp-deploy-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web-deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Remove vendor tests and docs
+        run: |
+          find vendor -type d \( -iname test -o -iname tests -o -iname docs -o -iname documentation \) -prune -exec rm -rf {} + || true
+          find vendor -type f \( -name '*.md' -o -name 'phpunit.xml*' -o -name '.phpunit.result.cache' \) -delete || true
+
+      - name: Sync files
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          log-level: minimal
+          timeout: 60000
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/.env.*
+            **/.github/**
+            **/tests/**
+            **/writable/logs/**
+            **/writable/session/**
+            **/writable/cache/**
+            **/writable/debugbar/**
+            **/uploads/**
+            **/bugs/**
+            **/docs/**
+            **/app.zip
+            **/*.md

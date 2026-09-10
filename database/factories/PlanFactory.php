@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\DurationUnit;
 use App\Enums\PlanType;
+use App\Models\Domain;
 use App\Models\Plan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -13,6 +14,22 @@ use Illuminate\Support\Str;
  */
 class PlanFactory extends Factory
 {
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Plan $plan): void {
+            if ($plan->domains()->exists()) {
+                return;
+            }
+
+            $domainId = Domain::query()->where('is_default', true)->value('id')
+                ?? Domain::query()->value('id');
+
+            if ($domainId) {
+                $plan->domains()->syncWithoutDetaching([$domainId]);
+            }
+        });
+    }
+
     /** @return array<string, mixed> */
     public function definition(): array
     {
@@ -28,10 +45,23 @@ class PlanFactory extends Factory
             'currency' => 'INR',
             'amount' => fake()->randomFloat(2, 199, 9999),
             'trial_days' => 0,
+            'jobs_allowed' => fake()->numberBetween(1, 20),
+            'job_duration_value' => 30,
+            'job_duration_unit' => DurationUnit::Day,
             'features' => fake()->words(3),
             'is_active' => true,
             'sort_order' => 0,
         ];
+    }
+
+    public function free(): static
+    {
+        return $this->state(fn () => [
+            'plan_type' => PlanType::Free,
+            'amount' => 0,
+            'discount_amount' => null,
+            'jobs_allowed' => 1,
+        ]);
     }
 
     public function inactive(): static

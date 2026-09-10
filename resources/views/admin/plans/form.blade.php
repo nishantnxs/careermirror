@@ -120,6 +120,44 @@
             </div>
         </div>
 
+        <div class="card mb-3">
+            <div class="card-header">Job posting limits</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="jobs_allowed" class="form-label required">Jobs allowed</label>
+                        <input type="number" min="1" name="jobs_allowed" id="jobs_allowed"
+                               class="form-control @error('jobs_allowed') is-invalid @enderror"
+                               value="{{ old('jobs_allowed', $plan->jobs_allowed ?? 1) }}" required>
+                        @error('jobs_allowed') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="form-text">How many jobs an employer can post with this plan.</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="job_duration_value" class="form-label required">Job duration</label>
+                        <input type="number" min="1" name="job_duration_value" id="job_duration_value"
+                               class="form-control @error('job_duration_value') is-invalid @enderror"
+                               value="{{ old('job_duration_value', $plan->job_duration_value ?? 30) }}">
+                        @error('job_duration_value') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="job_duration_unit" class="form-label required">Job duration unit</label>
+                        <select name="job_duration_unit" id="job_duration_unit"
+                                class="form-select @error('job_duration_unit') is-invalid @enderror" required>
+                            @foreach ($durationUnits as $value => $label)
+                                <option value="{{ $value }}"
+                                    @selected(old('job_duration_unit', $plan->job_duration_unit?->value ?? 'day') === $value)>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('job_duration_unit') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Features</span>
@@ -182,6 +220,28 @@
             </div>
         </div>
 
+        <div class="card mb-3">
+            <div class="card-header">Available domains</div>
+            <div class="card-body">
+                <p class="text-secondary small mb-3">Select which websites can show this plan to employers.</p>
+                @php($selectedDomainIds = collect($selectedDomainIds ?? old('domain_ids', []))->map(fn ($id) => (int) $id)->all())
+                @forelse ($domains ?? [] as $domain)
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="domain_ids[]"
+                               id="domain_{{ $domain->id }}" value="{{ $domain->id }}"
+                               @checked(in_array($domain->id, $selectedDomainIds, true))>
+                        <label class="form-check-label" for="domain_{{ $domain->id }}">
+                            {{ $domain->host }}
+                            <span class="text-secondary small">({{ $domain->displayName() }})</span>
+                        </label>
+                    </div>
+                @empty
+                    <p class="text-danger small mb-0">No domains found. Create a domain first.</p>
+                @endforelse
+                @error('domain_ids') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body d-flex flex-column gap-2">
                 <button type="submit" class="btn btn-brand">
@@ -217,17 +277,22 @@
         });
 
         // "Lifetime" plans have no numeric duration.
-        const unit = document.getElementById('duration_unit');
-        const value = document.getElementById('duration_value');
+        function bindLifetimeToggle(unitId, valueId) {
+            const unit = document.getElementById(unitId);
+            const value = document.getElementById(valueId);
 
-        function syncDuration() {
-            const lifetime = unit.value === 'lifetime';
-            value.disabled = lifetime;
-            value.parentElement.classList.toggle('opacity-50', lifetime);
+            function syncDuration() {
+                const lifetime = unit.value === 'lifetime';
+                value.disabled = lifetime;
+                value.parentElement.classList.toggle('opacity-50', lifetime);
+            }
+
+            unit.addEventListener('change', syncDuration);
+            syncDuration();
         }
 
-        unit.addEventListener('change', syncDuration);
-        syncDuration();
+        bindLifetimeToggle('duration_unit', 'duration_value');
+        bindLifetimeToggle('job_duration_unit', 'job_duration_value');
     })();
 </script>
 @endpush

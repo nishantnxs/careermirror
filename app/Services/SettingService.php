@@ -2,12 +2,33 @@
 
 namespace App\Services;
 
+use App\Models\Domain;
 use App\Models\Setting;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 class SettingService
 {
+    protected ?Domain $domain = null;
+
+    public function forDomain(Domain $domain): static
+    {
+        $clone = clone $this;
+        $clone->domain = $domain;
+
+        return $clone;
+    }
+
+    public function domain(): ?Domain
+    {
+        return $this->domain;
+    }
+
+    protected function domainId(): ?int
+    {
+        return $this->domain?->id ?? resolve_settings_domain_id();
+    }
+
     /** @return array<string, array<string, mixed>> */
     public function groups(): array
     {
@@ -15,8 +36,6 @@ class SettingService
     }
 
     /**
-     * Every defined field, flattened to key => definition (with its group attached).
-     *
      * @return array<string, array<string, mixed>>
      */
     public function fields(): array
@@ -33,8 +52,6 @@ class SettingService
     }
 
     /**
-     * Validation rules built from the settings definition.
-     *
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -48,37 +65,43 @@ class SettingService
         return $rules;
     }
 
-    /**
-     * Current value for a field, falling back to the definition default.
-     */
     public function value(string $key): mixed
     {
         $definition = $this->fields()[$key] ?? [];
 
-        return Setting::get($key, $definition['default'] ?? null);
+        return Setting::get($key, $definition['default'] ?? null, $this->domainId());
     }
 
     /**
-     * Persist a validated payload for a single settings group.
-     *
      * @param  array<string, mixed>  $data
      * @param  array<string, UploadedFile|null>  $files
+     * @return array{old: array<string, mixed>, new: array<string, mixed>}
      */
-    public function save(array $data, array $files = []): void
+    public function save(array $data, array $files = []): array
     {
+        $domainId = $this->domainId();
+
+        if ($domainId === null) {
+            throw new \RuntimeException('Cannot save settings without a domain.');
+        }
+
+        $old = [];
+        $new = [];
+
         foreach ($this->fields() as $key => $definition) {
             $type = $definition['type'] ?? 'text';
             $group = $definition['group'] ?? 'general';
 
-            // Only touch fields that were part of the submitted form.
             if ($type !== 'image' && ! array_key_exists($key, $data)) {
                 continue;
             }
 
+            $previous = Setting::get($key, $definition['default'] ?? null, $domainId);
+
             $value = match ($type) {
-                'image' => $this->resolveImage($key, $files[$key] ?? null, $data),
+                'image' => $this->resolveImage($key, $files[$key] ?? null, $data, $domainId),
                 'boolean' => array_key_exists($key, $data) && (bool) $data[$key] ? '1' : '0',
-                'password' => $this->resolvePassword($key, $data[$key] ?? null),
+                'password' => $this->resolvePassword($key, $data[$key] ?? null, $domainId),
                 default => $data[$key] ?? null,
             };
 
@@ -86,26 +109,46 @@ class SettingService
                 continue;
             }
 
-            Setting::set($key, $value, $group, $type);
+            if ((string) $previous !== (string) $value) {
+                $old[$key] = $type === 'password' ? '[hidden]' : $previous;
+                $new[$key] = $type === 'password' ? '[updated]' : $value;
+            }
+
+            Setting::set($key, $value, $group, $type, $domainId);
         }
 
-        Setting::flushCache();
+        Setting::flushCache($domainId);
+
+        if ($this->domain) {
+            $this->syncDomainProfile($this->domain, $domainId);
+        }
+
+        return ['old' => $old, 'new' => $new];
+    }
+
+    protected function syncDomainProfile(Domain $domain, int $domainId): void
+    {
+        $domain->update([
+            'website_name' => Setting::get('site_name', $domain->website_name, $domainId),
+            'seo_title' => Setting::get('seo_title', $domain->seo_title, $domainId),
+            'seo_description' => Setting::get('seo_description', $domain->seo_description, $domainId),
+            'seo_keywords' => Setting::get('seo_keywords', $domain->seo_keywords, $domainId),
+            'logo_path' => Setting::get('site_logo', $domain->logo_path, $domainId),
+            'favicon_path' => Setting::get('site_favicon', $domain->favicon_path, $domainId),
+        ]);
     }
 
     /**
-     * Store a newly uploaded image, honour the "remove" checkbox, or keep the
-     * existing file when nothing was submitted.
-     *
      * @param  array<string, mixed>  $data
      */
-    protected function resolveImage(string $key, ?UploadedFile $file, array $data): mixed
+    protected function resolveImage(string $key, ?UploadedFile $file, array $data, int $domainId): mixed
     {
-        $existing = Setting::get($key);
+        $existing = Setting::get($key, null, $domainId);
 
         if ($file instanceof UploadedFile) {
             $this->deleteFile($existing);
 
-            return $file->store('settings', 'public');
+            return $file->store('settings/'.$domainId, 'public');
         }
 
         if (! empty($data['remove_'.$key])) {
@@ -117,7 +160,7 @@ class SettingService
         return self::skip();
     }
 
-    protected function resolvePassword(string $key, ?string $value): mixed
+    protected function resolvePassword(string $key, ?string $value, int $domainId): mixed
     {
         return blank($value) ? self::skip() : $value;
     }
@@ -129,7 +172,6 @@ class SettingService
         }
     }
 
-    /** Sentinel meaning "leave this setting untouched". */
     protected static function skip(): string
     {
         return '__setting_unchanged__';

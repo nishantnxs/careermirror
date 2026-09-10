@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Domain;
 use App\Models\Setting;
 use App\Services\SettingService;
 use Illuminate\Database\Seeder;
@@ -14,6 +15,13 @@ class SettingSeeder extends Seeder
      */
     public function run(): void
     {
+        $domainId = Domain::query()->where('is_default', true)->value('id')
+            ?? Domain::query()->value('id');
+
+        if ($domainId === null) {
+            return;
+        }
+
         $seeded = [
             'site_name' => 'CareerMirror',
             'site_tagline' => 'See your career clearly.',
@@ -23,8 +31,8 @@ class SettingSeeder extends Seeder
         ];
 
         foreach (app(SettingService::class)->fields() as $key => $definition) {
-            Setting::firstOrCreate(
-                ['key' => $key],
+            Setting::query()->firstOrCreate(
+                ['domain_id' => $domainId, 'key' => $key],
                 [
                     'value' => $seeded[$key] ?? $definition['default'] ?? null,
                     'group' => $definition['group'] ?? 'general',
@@ -33,6 +41,6 @@ class SettingSeeder extends Seeder
             );
         }
 
-        Setting::flushCache();
+        Setting::flushCache($domainId);
     }
 }

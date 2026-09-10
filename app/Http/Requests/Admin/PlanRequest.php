@@ -39,6 +39,12 @@ class PlanRequest extends FormRequest
             'discount_amount' => ['nullable', 'numeric', 'min:0', 'lt:amount'],
 
             'trial_days' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'jobs_allowed' => ['required', 'integer', 'min:1', 'max:10000'],
+            'job_duration_unit' => ['required', Rule::enum(DurationUnit::class)],
+            'job_duration_value' => [
+                'required_unless:job_duration_unit,lifetime',
+                'nullable', 'integer', 'min:1', 'max:1000',
+            ],
             'features' => ['nullable', 'array'],
             'features.*' => ['nullable', 'string', 'max:255'],
 
@@ -46,6 +52,8 @@ class PlanRequest extends FormRequest
             'is_featured' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'domain_ids' => ['required', 'array', 'min:1'],
+            'domain_ids.*' => ['integer', 'exists:domains,id'],
         ];
     }
 
@@ -56,6 +64,7 @@ class PlanRequest extends FormRequest
             'discount_amount.lt' => 'The discounted price must be lower than the plan amount.',
             'expiry_date.after_or_equal' => 'The expiry date cannot be in the past.',
             'duration_value.required_unless' => 'Please enter how long the plan lasts.',
+            'job_duration_value.required_unless' => 'Please enter how long each job posting lasts.',
         ];
     }
 
@@ -67,6 +76,7 @@ class PlanRequest extends FormRequest
     public function planData(): array
     {
         $isLifetime = $this->input('duration_unit') === DurationUnit::Lifetime->value;
+        $isJobLifetime = $this->input('job_duration_unit') === DurationUnit::Lifetime->value;
 
         $features = collect($this->input('features', []))
             ->map(fn ($feature) => trim((string) $feature))
@@ -84,6 +94,9 @@ class PlanRequest extends FormRequest
             'amount' => $this->input('amount'),
             'discount_amount' => $this->filled('discount_amount') ? $this->input('discount_amount') : null,
             'trial_days' => (int) $this->input('trial_days', 0),
+            'jobs_allowed' => (int) $this->input('jobs_allowed'),
+            'job_duration_value' => $isJobLifetime ? 1 : (int) $this->input('job_duration_value'),
+            'job_duration_unit' => $this->input('job_duration_unit'),
             'features' => $features === [] ? null : $features,
             'expiry_date' => $this->filled('expiry_date') ? $this->input('expiry_date') : null,
             'is_featured' => $this->boolean('is_featured'),
@@ -96,5 +109,16 @@ class PlanRequest extends FormRequest
         }
 
         return $data;
+    }
+
+    /** @return list<int> */
+    public function domainIds(): array
+    {
+        return collect($this->input('domain_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }

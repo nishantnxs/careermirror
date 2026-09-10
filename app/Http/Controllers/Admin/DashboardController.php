@@ -3,27 +3,29 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Plan;
+use App\Services\AdminDashboardService;
+use App\Support\DateRange;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(Request $request, AdminDashboardService $dashboard): View|RedirectResponse
     {
-        $stats = [
-            'total_plans' => Plan::count(),
-            'active_plans' => Plan::active()->count(),
-            'expiring_plans' => Plan::whereNotNull('expiry_date')
-                ->whereDate('expiry_date', '>=', now()->toDateString())
-                ->whereDate('expiry_date', '<=', now()->addDays(30)->toDateString())
-                ->count(),
-            'expired_plans' => Plan::whereNotNull('expiry_date')
-                ->whereDate('expiry_date', '<', now()->toDateString())
-                ->count(),
-        ];
+        try {
+            $range = DateRange::fromRequest($request);
+        } catch (InvalidArgumentException) {
+            return redirect()->route('admin.dashboard', ['range' => 'this_month'])
+                ->withErrors(['start_date' => 'Please provide a valid custom date range.']);
+        }
 
-        $recentPlans = Plan::latest()->take(5)->get();
+        $overview = $dashboard->overview($range);
 
-        return view('admin.dashboard', compact('stats', 'recentPlans'));
+        return view('admin.dashboard', [
+            ...$overview,
+            'rangePresets' => DateRange::presetOptions(),
+        ]);
     }
 }

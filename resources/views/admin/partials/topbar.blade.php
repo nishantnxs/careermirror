@@ -1,4 +1,8 @@
-@php($admin = auth('admin')->user())
+@php
+    $admin = auth('admin')->user();
+    $adminDomains = \App\Models\Domain::query()->orderByDesc('is_default')->orderBy('name')->get();
+    $adminContextDomainId = session(\App\Services\DomainService::ADMIN_SESSION_KEY);
+@endphp
 
 <header class="admin-topbar">
     <button class="btn btn-light btn-sm d-lg-none" type="button" id="sidebarToggle" aria-label="Toggle navigation">
@@ -6,6 +10,22 @@
     </button>
 
     <div class="ms-auto d-flex align-items-center gap-3">
+        @if ($adminDomains->isNotEmpty())
+            <form method="POST" action="{{ route('admin.domains.switch-context') }}" class="d-flex align-items-center gap-2 mb-0">
+                @csrf
+                <label for="adminDomainContext" class="small text-secondary mb-0 d-none d-md-inline">Website</label>
+                <select name="domain_id" id="adminDomainContext" class="form-select form-select-sm" style="min-width: 11rem"
+                        onchange="this.form.submit()">
+                    <option value="">All domains</option>
+                    @foreach ($adminDomains as $domainOption)
+                        <option value="{{ $domainOption->id }}" @selected((string) $adminContextDomainId === (string) $domainOption->id)>
+                            {{ $domainOption->host }}
+                        </option>
+                    @endforeach
+                </select>
+            </form>
+        @endif
+
         <a href="{{ url('/') }}" target="_blank" class="text-secondary small d-none d-sm-inline">
             <i class="bi bi-box-arrow-up-right me-1"></i> View website
         </a>

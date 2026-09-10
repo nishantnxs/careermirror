@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Admin;
+use App\Models\Candidate;
+use App\Models\Employer;
 use App\Models\User;
 
 return [
@@ -48,6 +50,16 @@ return [
             'driver' => 'session',
             'provider' => 'admins',
         ],
+
+        'candidate' => [
+            'driver' => 'session',
+            'provider' => 'candidates',
+        ],
+
+        'employer' => [
+            'driver' => 'session',
+            'provider' => 'employers',
+        ],
     ],
 
     /*
@@ -76,6 +88,16 @@ return [
         'admins' => [
             'driver' => 'eloquent',
             'model' => Admin::class,
+        ],
+
+        'candidates' => [
+            'driver' => 'eloquent',
+            'model' => Candidate::class,
+        ],
+
+        'employers' => [
+            'driver' => 'eloquent',
+            'model' => Employer::class,
         ],
 
         // 'users' => [
@@ -114,6 +136,20 @@ return [
         'admins' => [
             'provider' => 'admins',
             'table' => 'admin_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'candidates' => [
+            'provider' => 'candidates',
+            'table' => 'candidate_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'employers' => [
+            'provider' => 'employers',
+            'table' => 'employer_password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],

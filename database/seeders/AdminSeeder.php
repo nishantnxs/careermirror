@@ -15,6 +15,8 @@ class AdminSeeder extends Seeder
                 'name' => env('ADMIN_NAME', 'Super Admin'),
                 'password' => env('ADMIN_PASSWORD', 'Admin@123'),
                 'is_active' => true,
+                'is_super_admin' => true,
+                'admin_role_id' => null,
             ],
         );
     }

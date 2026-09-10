@@ -7,6 +7,8 @@ use App\Enums\PlanType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -25,6 +27,9 @@ class Plan extends Model
         'amount',
         'discount_amount',
         'trial_days',
+        'jobs_allowed',
+        'job_duration_value',
+        'job_duration_unit',
         'features',
         'expiry_date',
         'is_featured',
@@ -37,7 +42,10 @@ class Plan extends Model
         return [
             'plan_type' => PlanType::class,
             'duration_unit' => DurationUnit::class,
+            'job_duration_unit' => DurationUnit::class,
             'duration_value' => 'integer',
+            'job_duration_value' => 'integer',
+            'jobs_allowed' => 'integer',
             'trial_days' => 'integer',
             'sort_order' => 'integer',
             'amount' => 'decimal:2',
@@ -60,24 +68,38 @@ class Plan extends Model
 
     public static function uniqueSlug(string $title, ?int $ignoreId = null): string
     {
-        $base = Str::slug($title) ?: 'plan';
-        $slug = $base;
-        $suffix = 1;
+        return unique_slug(
+            $title,
+            fn (string $slug): bool => static::withTrashed()
+                ->where('slug', $slug)
+                ->when($ignoreId, fn (Builder $query) => $query->whereKeyNot($ignoreId))
+                ->exists(),
+            'plan',
+        );
+    }
 
-        while (static::withTrashed()
-            ->where('slug', $slug)
-            ->when($ignoreId, fn (Builder $query) => $query->whereKeyNot($ignoreId))
-            ->exists()
-        ) {
-            $slug = $base.'-'.++$suffix;
-        }
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 
-        return $slug;
+    public function domains(): BelongsToMany
+    {
+        return $this->belongsToMany(Domain::class, 'domain_plan')->withTimestamps();
+    }
+
+    public function isFree(): bool
+    {
+        return $this->plan_type === PlanType::Free || (float) $this->payable_amount <= 0;
     }
 
     /** The price a customer actually pays. */
     public function getPayableAmountAttribute(): float
     {
+        if ($this->plan_type === PlanType::Free) {
+            return 0.0;
+        }
+
         $discount = $this->discount_amount;
 
         if ($discount !== null && (float) $discount < (float) $this->amount) {
@@ -112,12 +134,31 @@ class Plan extends Model
         );
     }
 
+    public function getJobDurationLabelAttribute(): string
+    {
+        if ($this->job_duration_unit === DurationUnit::Lifetime) {
+            return 'Lifetime';
+        }
+
+        return $this->job_duration_value.' '.Str::plural(
+            ucfirst($this->job_duration_unit->value),
+            $this->job_duration_value
+        );
+    }
+
     /** Total days of access this plan grants, or null for lifetime. */
     public function getDurationInDaysAttribute(): ?int
     {
         $days = $this->duration_unit->days();
 
         return $days === null ? null : $days * $this->duration_value;
+    }
+
+    public function getJobDurationInDaysAttribute(): ?int
+    {
+        $days = $this->job_duration_unit->days();
+
+        return $days === null ? null : $days * $this->job_duration_value;
     }
 
     public function getIsExpiredAttribute(): bool
@@ -127,6 +168,10 @@ class Plan extends Model
 
     public function getFormattedAmountAttribute(): string
     {
+        if ($this->isFree()) {
+            return 'Free';
+        }
+
         return $this->currencySymbol().number_format($this->payable_amount, 2);
     }
 
@@ -151,6 +196,17 @@ class Plan extends Model
         return $query->active()->where(function (Builder $query) {
             $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now()->toDateString());
         });
+    }
+
+    public function scopeForDomain(Builder $query, Domain|int|null $domain): Builder
+    {
+        if ($domain === null) {
+            return $query;
+        }
+
+        $domainId = $domain instanceof Domain ? $domain->id : $domain;
+
+        return $query->whereHas('domains', fn (Builder $query) => $query->where('domains.id', $domainId));
     }
 
     public function scopeOrdered(Builder $query): Builder

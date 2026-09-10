@@ -39,6 +39,17 @@
                         <dt class="col-sm-4 text-secondary fw-normal">Free trial</dt>
                         <dd class="col-sm-8">{{ $plan->trial_days > 0 ? $plan->trial_days.' days' : 'None' }}</dd>
 
+                        <dt class="col-sm-4 text-secondary fw-normal">Jobs allowed</dt>
+                        <dd class="col-sm-8">{{ $plan->jobs_allowed }}</dd>
+
+                        <dt class="col-sm-4 text-secondary fw-normal">Job posting duration</dt>
+                        <dd class="col-sm-8">
+                            {{ $plan->job_duration_label }}
+                            @if ($plan->job_duration_in_days)
+                                <span class="text-secondary small">({{ $plan->job_duration_in_days }} days)</span>
+                            @endif
+                        </dd>
+
                         <dt class="col-sm-4 text-secondary fw-normal">Expiry date</dt>
                         <dd class="col-sm-8">
                             @if ($plan->expiry_date)

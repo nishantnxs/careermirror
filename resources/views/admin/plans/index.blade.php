@@ -58,7 +58,9 @@
                         <th style="width:60px">#</th>
                         <th>Plan</th>
                         <th>Type</th>
+                        <th>Domains</th>
                         <th>Duration</th>
+                        <th class="text-center">Jobs</th>
                         <th class="text-end">Amount</th>
                         <th>Expiry</th>
                         <th class="text-center">Status</th>
@@ -85,12 +87,20 @@
                                     {{ $plan->plan_type->label() }}
                                 </span>
                             </td>
+                            <td>
+                                @forelse ($plan->domains as $domain)
+                                    <span class="badge bg-light text-dark border">{{ $domain->host }}</span>
+                                @empty
+                                    <span class="text-secondary">—</span>
+                                @endforelse
+                            </td>
                             <td class="text-secondary">
                                 {{ $plan->duration_label }}
                                 @if ($plan->trial_days > 0)
                                     <div style="font-size:.78rem">+ {{ $plan->trial_days }}d trial</div>
                                 @endif
                             </td>
+                            <td class="text-center text-secondary">{{ $plan->jobs_allowed }}</td>
                             <td class="text-end">
                                 <span class="fw-semibold">{{ $plan->formatted_amount }}</span>
                                 @if ($plan->discount_percent)
@@ -138,7 +148,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-5">
+                            <td colspan="10" class="text-center text-secondary py-5">
                                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                                 No plans found.
                                 <a href="{{ route('admin.plans.create') }}" class="text-brand">Add your first plan</a>.

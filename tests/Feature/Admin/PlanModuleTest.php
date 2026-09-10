@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Admin;
+use App\Models\Domain;
 use App\Models\Plan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,11 +34,15 @@ class PlanModuleTest extends TestCase
             'amount' => '4999.00',
             'discount_amount' => '3999.00',
             'trial_days' => 14,
+            'jobs_allowed' => 5,
+            'job_duration_value' => 30,
+            'job_duration_unit' => 'day',
             'features' => ['Unlimited reviews', '', 'Career coaching'],
             'expiry_date' => now()->addMonth()->toDateString(),
             'is_featured' => '1',
             'is_active' => '1',
             'sort_order' => 3,
+            'domain_ids' => [Domain::query()->value('id')],
         ], $overrides);
     }
 

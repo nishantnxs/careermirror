@@ -36,14 +36,19 @@ class PlanPurchaseTest extends TestCase
         $this->actingAs($this->employer, 'employer')
             ->get('/employer/plans')
             ->assertOk()
+            ->assertSee('Plans that grow with your hiring')
             ->assertSee('Starter Free')
             ->assertSee('Growth Paid')
+            ->assertSee('Start free')
             ->assertDontSee('Hidden');
     }
 
     public function test_checkout_shows_gateway_payment_methods(): void
     {
-        $plan = Plan::factory()->create(['amount' => 500]);
+        $plan = Plan::factory()->create([
+            'amount' => 500,
+            'plan_type' => PlanType::Basic,
+        ]);
 
         $this->actingAs($this->employer, 'employer')
             ->get("/employer/plans/{$plan->id}/checkout")
@@ -180,7 +185,51 @@ class PlanPurchaseTest extends TestCase
 
         $this->assertSame(1, EmployerSubscription::query()->where('status', 'active')->count());
         $this->assertSame(1, EmployerSubscription::query()->where('status', 'cancelled')->count());
-        $this->assertSame(3, EmployerSubscription::query()->where('status', 'active')->value('jobs_allowed'));
+        $this->assertSame(4, EmployerSubscription::query()->where('status', 'active')->value('jobs_allowed'));
+    }
+
+    public function test_buying_another_plan_carries_unused_job_credits(): void
+    {
+        $free = Plan::factory()->free()->create(['jobs_allowed' => 1]);
+        $starter = Plan::factory()->create([
+            'amount' => 399,
+            'jobs_allowed' => 1,
+            'plan_type' => PlanType::Basic,
+        ]);
+        $quarterly = Plan::factory()->create([
+            'amount' => 1299,
+            'jobs_allowed' => 1,
+            'plan_type' => PlanType::Standard,
+        ]);
+
+        $this->actingAs($this->employer, 'employer')
+            ->post("/employer/plans/{$free->id}/purchase")
+            ->assertRedirect();
+
+        $this->buyPaidPlan($starter);
+        $this->buyPaidPlan($quarterly);
+
+        $active = EmployerSubscription::query()->where('status', 'active')->first();
+
+        $this->assertNotNull($active);
+        $this->assertSame(3, $active->jobs_allowed);
+        $this->assertSame(0, $active->jobs_used);
+        $this->assertSame(2, EmployerSubscription::query()->where('status', 'cancelled')->count());
+    }
+
+    protected function buyPaidPlan(Plan $plan): void
+    {
+        $start = $this->actingAs($this->employer, 'employer')
+            ->post("/employer/plans/{$plan->id}/purchase", [
+                'payment_mode' => 'upi',
+            ]);
+
+        $order = Order::query()->where('plan_id', $plan->id)->latest('id')->firstOrFail();
+        $start->assertRedirect(route('employer.payments.fake.complete', $order));
+
+        $this->actingAs($this->employer, 'employer')
+            ->get(route('employer.payments.fake.complete', $order))
+            ->assertRedirect();
     }
 
     public function test_orders_index_shows_purchase_history(): void

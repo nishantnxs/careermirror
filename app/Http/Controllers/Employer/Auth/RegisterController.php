@@ -13,16 +13,15 @@ class RegisterController extends Controller
 {
     public function create(): View
     {
-        return view('employer.auth.register');
+        return view('auth.create-account', [
+            'activeTab' => 'employer',
+        ]);
     }
 
     public function store(RegisterRequest $request): RedirectResponse
     {
         $employer = Employer::create($request->validated());
-
-        if ($domain = current_domain()) {
-            $employer->domains()->syncWithoutDetaching([$domain->id]);
-        }
+        $employer->grantActiveDomains();
 
         Auth::guard('employer')->login($employer);
 

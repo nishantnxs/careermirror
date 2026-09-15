@@ -6,6 +6,7 @@ use App\Enums\AccountStatus;
 use App\Models\Concerns\HasAccountStatus;
 use Database\Factories\EmployerFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +22,7 @@ class Employer extends Authenticatable
         'name',
         'company_name',
         'email',
+        'google_id',
         'phone',
         'password',
         'status',
@@ -52,9 +54,28 @@ class Employer extends Authenticatable
         return $this->hasMany(EmployerSubscription::class);
     }
 
+    public function currentSubscription(): ?EmployerSubscription
+    {
+        return $this->subscriptions()->active()->latest('id')->first();
+    }
+
+    public function subscriptionAvailableForPosting(): ?EmployerSubscription
+    {
+        return $this->subscriptions()
+            ->active()
+            ->withRemainingCredits()
+            ->latest('id')
+            ->first();
+    }
+
     public function jobPostings(): HasMany
     {
         return $this->hasMany(JobPosting::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
     }
 
     public function domains(): BelongsToMany
@@ -62,10 +83,31 @@ class Employer extends Authenticatable
         return $this->belongsToMany(Domain::class, 'domain_employer')->withTimestamps();
     }
 
+    public function grantActiveDomains(): void
+    {
+        $domainIds = Domain::query()->active()->pluck('id')->all();
+
+        if ($domainIds !== []) {
+            $this->domains()->syncWithoutDetaching($domainIds);
+        }
+    }
+
     /** @return list<int> */
     public function allowedDomainIds(): array
     {
-        return $this->domains()->pluck('domains.id')->map(fn ($id) => (int) $id)->all();
+        return $this->domains()
+            ->active()
+            ->pluck('domains.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, Domain>
+     */
+    public function publishingDomains(): Collection
+    {
+        return $this->domains()->active()->orderBy('host')->get();
     }
 
     public function scopeSearch(Builder $query, ?string $term): Builder

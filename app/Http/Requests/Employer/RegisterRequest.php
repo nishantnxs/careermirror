@@ -23,4 +23,9 @@ class RegisterRequest extends FormRequest
             'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return route('employer.register');
+    }
 }

@@ -13,7 +13,7 @@ class ExampleTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Candidate')
-            ->assertSee('Employer');
+            ->assertSee('See the job market clearly.')
+            ->assertSee('Browse jobs');
     }
 }

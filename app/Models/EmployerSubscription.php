@@ -89,4 +89,9 @@ class EmployerSubscription extends Model
                 $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
             });
     }
+
+    public function scopeWithRemainingCredits(Builder $query): Builder
+    {
+        return $query->whereColumn('jobs_used', '<', 'jobs_allowed');
+    }
 }

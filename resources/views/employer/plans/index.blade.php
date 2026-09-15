@@ -1,76 +1,108 @@
-@extends('layouts.portal')
+@extends('layouts.marketing')
 
 @section('title', 'Plans')
-@section('account_label', auth('employer')->user()->company_name)
-@section('logout_action', route('employer.logout'))
-
-@section('nav')
-    @include('employer.partials.nav', ['active' => 'plans'])
-@endsection
 
 @section('content')
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
-        <div>
-            <h1 class="h4 fw-semibold mb-1">Subscription plans</h1>
-            <p class="text-secondary mb-0">Choose a plan to unlock job posting credits.</p>
+@php
+    $periodLabel = function (\App\Models\Plan $plan): ?string {
+        if ($plan->isFree()) {
+            return null;
+        }
+
+        return match ($plan->duration_unit) {
+            \App\Enums\DurationUnit::Day => '/day',
+            \App\Enums\DurationUnit::Week => '/week',
+            \App\Enums\DurationUnit::Month => '/month',
+            \App\Enums\DurationUnit::Year => '/year',
+            default => null,
+        };
+    };
+
+    $priceHtml = function (\App\Models\Plan $plan) use ($periodLabel): string {
+        if ($plan->isFree()) {
+            return 'Free';
+        }
+
+        $amount = (float) $plan->payable_amount;
+        $formatted = $plan->currencySymbol().number_format($amount, fmod($amount, 1.0) === 0.0 ? 0 : 2);
+        $period = $periodLabel($plan);
+
+        return $period
+            ? e($formatted).'<span>'.e($period).'</span>'
+            : e($formatted);
+    };
+@endphp
+
+<section class="pricing-section employer-panel">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h2 class="pricing-title mb-2">Plans that grow with your hiring</h2>
+                <p class="pricing-subtitle mb-5">
+                    Every plan includes applicant tracking, resume viewing and direct messaging.
+                    Upgrade or<br class="d-none d-md-block">
+                    change at any time.
+                </p>
+            </div>
         </div>
+
         @if ($subscription)
-            <div class="badge {{ $subscription->status->badgeClass() }} p-2">
-                Active: {{ $subscription->plan?->title ?? 'Plan' }}
-                &middot; {{ $subscription->remainingJobs() }} job(s) left
-                @if ($subscription->ends_at)
-                    &middot; expires {{ $subscription->ends_at->format('d M Y') }}
-                @endif
+            <div class="row justify-content-center mb-4">
+                <div class="col-12 col-lg-8">
+                    <div class="application-card text-center">
+                        <p class="application-meta mb-0">
+                            Active plan:
+                            <strong>{{ $subscription->plan?->title ?? 'Plan' }}</strong>
+                            · {{ $subscription->remainingJobs() }} job(s) left
+                            @if ($subscription->ends_at)
+                                · expires {{ $subscription->ends_at->format('d M Y') }}
+                            @endif
+                        </p>
+                    </div>
+                </div>
             </div>
         @endif
-    </div>
 
-    <div class="row g-3">
-        @forelse ($plans as $plan)
-            <div class="col-md-6">
-                <div class="card h-100 {{ $plan->is_featured ? 'border-brand' : '' }}">
-                    <div class="card-body d-flex flex-column">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <span class="badge {{ $plan->plan_type->badgeClass() }} mb-2">{{ $plan->plan_type->label() }}</span>
-                                <h2 class="h5 fw-semibold mb-0">{{ $plan->title }}</h2>
-                            </div>
-                            @if ($plan->is_featured)
-                                <span class="badge bg-warning-subtle text-warning-emphasis">Popular</span>
-                            @endif
-                        </div>
-
-                        <div class="display-6 fw-bold text-brand my-3">{{ $plan->formatted_amount }}</div>
-                        <p class="text-secondary small mb-3">{{ $plan->description }}</p>
-
-                        <ul class="list-unstyled small text-secondary mb-4">
-                            <li class="mb-1"><i class="bi bi-briefcase me-1"></i> {{ $plan->jobs_allowed }} job posting(s)</li>
-                            <li class="mb-1"><i class="bi bi-clock-history me-1"></i> Plan access: {{ $plan->duration_label }}</li>
-                            <li class="mb-1"><i class="bi bi-calendar-event me-1"></i> Each job live for: {{ $plan->job_duration_label }}</li>
-                        </ul>
-
-                        @if (filled($plan->features))
-                            <ul class="list-unstyled small mb-4">
-                                @foreach ($plan->features as $feature)
-                                    <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i> {{ $feature }}</li>
-                                @endforeach
-                            </ul>
+        <div class="row justify-content-center g-4">
+            @forelse ($plans as $plan)
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="pricing-card h-100 {{ $plan->is_featured ? 'pricing-card-popular' : '' }}">
+                        @if ($plan->is_featured)
+                            <div class="popular-badge">Most popular</div>
                         @endif
 
-                        <div class="mt-auto">
-                            <a href="{{ route('employer.plans.checkout', $plan) }}" class="btn btn-brand w-100">
-                                {{ $plan->isFree() ? 'Activate free plan' : 'Buy this plan' }}
+                        <h3 class="plan-name">{{ $plan->title }}</h3>
+                        <div class="plan-price">{!! $priceHtml($plan) !!}</div>
+                        <p class="plan-description">
+                            {{ $plan->description ?: 'Up to '.$plan->jobs_allowed.' active job post'.($plan->jobs_allowed === 1 ? '' : 's') }}
+                        </p>
+
+                        <ul class="plan-features">
+                            <li>{{ $plan->jobs_allowed }} active job posting{{ $plan->jobs_allowed === 1 ? '' : 's' }}</li>
+                            <li>Plan access: {{ $plan->duration_label }}</li>
+                            <li>Each job live for: {{ $plan->job_duration_label }}</li>
+                            @foreach ($plan->features ?? [] as $feature)
+                                @continue(blank($feature))
+                                <li>{{ $feature }}</li>
+                            @endforeach
+                        </ul>
+
+                        <div class="plan-button-wrap">
+                            <a href="{{ route('employer.plans.checkout', $plan) }}"
+                               class="plan-btn {{ $plan->is_featured ? 'plan-btn-primary' : '' }}">
+                                {{ $plan->isFree() ? 'Start free' : 'Choose plan' }}
                             </a>
                         </div>
                     </div>
                 </div>
-            </div>
-        @empty
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body text-secondary">No plans are available right now. Please check back later.</div>
+            @empty
+                <div class="col-12 col-lg-6">
+                    <div class="pricing-card text-center">
+                        <p class="plan-description mb-0">No plans are available right now. Please check back later.</p>
+                    </div>
                 </div>
-            </div>
-        @endforelse
+            @endforelse
+        </div>
     </div>
+</section>
 @endsection

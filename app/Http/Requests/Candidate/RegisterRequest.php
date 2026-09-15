@@ -22,4 +22,9 @@ class RegisterRequest extends FormRequest
             'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return route('candidate.register');
+    }
 }

@@ -94,7 +94,10 @@ class AdminAccessSeeder extends Seeder
         }
 
         Admin::query()
-            ->where('email', env('ADMIN_EMAIL', 'admin@careermirror.com'))
+            ->where(function ($query): void {
+                $query->where('email', env('ADMIN_EMAIL', 'admin@careermirror.com'))
+                    ->orWhereNull('admin_role_id');
+            })
             ->update(['is_super_admin' => true, 'admin_role_id' => null]);
     }
 }

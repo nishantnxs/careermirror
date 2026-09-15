@@ -352,10 +352,21 @@ class PlanPurchaseService
 
     protected function activateSubscription(Employer $employer, Order $order, Plan $plan): EmployerSubscription
     {
-        EmployerSubscription::query()
+        $previous = EmployerSubscription::query()
             ->where('employer_id', $employer->id)
-            ->where('status', SubscriptionStatus::Active)
-            ->update(['status' => SubscriptionStatus::Cancelled]);
+            ->active()
+            ->lockForUpdate()
+            ->get();
+
+        $carriedJobCredits = $previous->sum(
+            fn (EmployerSubscription $subscription) => $subscription->remainingJobs()
+        );
+
+        if ($previous->isNotEmpty()) {
+            EmployerSubscription::query()
+                ->whereIn('id', $previous->modelKeys())
+                ->update(['status' => SubscriptionStatus::Cancelled]);
+        }
 
         $startsAt = now();
         $endsAt = $plan->duration_in_days === null
@@ -369,7 +380,7 @@ class PlanPurchaseService
             'status' => SubscriptionStatus::Active,
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
-            'jobs_allowed' => $plan->jobs_allowed,
+            'jobs_allowed' => $plan->jobs_allowed + $carriedJobCredits,
             'jobs_used' => 0,
             'job_duration_days' => $plan->job_duration_in_days,
         ]);

@@ -1,30 +1,32 @@
-@extends('layouts.portal')
+@extends('layouts.marketing')
 
 @section('title', 'Edit job')
-@section('account_label', auth('employer')->user()->company_name)
-@section('logout_action', route('employer.logout'))
-
-@section('nav')
-    @include('employer.partials.nav', ['active' => 'jobs'])
-@endsection
 
 @section('content')
-    <div class="mb-4">
-        <h1 class="h4 fw-semibold mb-1">Edit job</h1>
-        <p class="text-secondary mb-0">{{ $job->title }}</p>
-    </div>
-
-    <div class="card">
-        <div class="card-body">
-            <form method="POST" action="{{ route('employer.jobs.update', $job) }}">
-                @csrf
-                @method('PUT')
-                @include('employer.jobs.form')
-                <div class="d-flex gap-2 mt-3">
-                    <button type="submit" class="btn btn-brand">Save changes</button>
-                    <a href="{{ route('employer.jobs.index') }}" class="btn btn-light">Cancel</a>
+<section class="employer-panel">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+                <div class="mb-4">
+                    <h1 class="panel-title">Edit job</h1>
+                    <p class="panel-subtitle">{{ $job->title }}</p>
                 </div>
-            </form>
+
+                <div class="panel-card">
+                    <div class="panel-card-body">
+                        <form method="POST" action="{{ route('employer.jobs.update', $job) }}">
+                            @csrf
+                            @method('PUT')
+                            @include('employer.jobs.form')
+                            <div class="d-flex flex-wrap gap-2 mt-4">
+                                <button type="submit" class="btn btn-primary">Save changes</button>
+                                <a href="{{ route('employer.jobs.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</section>
 @endsection

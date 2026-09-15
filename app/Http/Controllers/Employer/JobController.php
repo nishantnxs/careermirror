@@ -6,6 +6,7 @@ use App\Enums\ActivityAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employer\JobRequest;
 use App\Models\Category;
+use App\Models\Domain;
 use App\Models\JobPosting;
 use App\Services\ActivityLogger;
 use App\Services\JobPostingService;
@@ -20,28 +21,21 @@ class JobController extends Controller
     {
         $jobs = JobPosting::query()
             ->with('category')
+            ->withCount('applications')
             ->where('employer_id', $request->user('employer')->id)
             ->latest('id')
             ->paginate(10);
 
-        $subscription = $request->user('employer')
-            ->subscriptions()
-            ->active()
-            ->latest('id')
-            ->first();
+        $subscription = $request->user('employer')->currentSubscription();
 
         return view('employer.jobs.index', compact('jobs', 'subscription'));
     }
 
     public function create(Request $request): View|RedirectResponse
     {
-        $subscription = $request->user('employer')
-            ->subscriptions()
-            ->active()
-            ->latest('id')
-            ->first();
+        $subscription = $request->user('employer')->subscriptionAvailableForPosting();
 
-        if ($subscription === null || ! $subscription->canPostJob()) {
+        if ($subscription === null) {
             return redirect()
                 ->route('employer.plans.index')
                 ->with('error', 'Buy or activate a plan with remaining job credits before posting a job.');
@@ -51,7 +45,7 @@ class JobController extends Controller
             'job' => new JobPosting(['currency' => 'INR', 'status' => 'published']),
             'subscription' => $subscription,
             'categories' => $this->approvedCategories(),
-            'availableDomains' => $request->user('employer')->domains()->orderBy('host')->get(),
+            'availableDomains' => Domain::query()->active()->orderBy('host')->get(),
         ]);
     }
 
@@ -72,7 +66,7 @@ class JobController extends Controller
             'job' => $job->load(['category', 'domains']),
             'subscription' => $job->subscription,
             'categories' => $this->approvedCategories(),
-            'availableDomains' => auth('employer')->user()->domains()->orderBy('host')->get(),
+            'availableDomains' => Domain::query()->active()->orderBy('host')->get(),
         ]);
     }
 

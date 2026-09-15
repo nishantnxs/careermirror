@@ -4,6 +4,7 @@ namespace App\Http\Requests\Employer;
 
 use App\Enums\JobStatus;
 use App\Models\Category;
+use App\Models\Domain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -64,8 +65,7 @@ class JobRequest extends FormRequest
                 }
             }
 
-            $employer = $this->user('employer');
-            $allowed = $employer?->allowedDomainIds() ?? [];
+            $allowed = Domain::query()->active()->pluck('id')->map(fn ($id) => (int) $id)->all();
             $selected = collect($this->input('domain_ids', []))->map(fn ($id) => (int) $id)->filter()->unique()->all();
 
             if ($selected === []) {
@@ -74,7 +74,7 @@ class JobRequest extends FormRequest
 
             foreach ($selected as $domainId) {
                 if (! in_array($domainId, $allowed, true)) {
-                    $validator->errors()->add('domain_ids', 'One or more selected domains are not allowed for your account.');
+                    $validator->errors()->add('domain_ids', 'Select at least one active website for this job.');
                     break;
                 }
             }

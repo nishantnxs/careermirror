@@ -18,23 +18,17 @@ class PlanController extends Controller
     {
         $plans = Plan::query()
             ->available()
-            ->forDomain(current_domain())
             ->ordered()
             ->get();
 
-        $subscription = auth('employer')->user()
-            ->subscriptions()
-            ->active()
-            ->with('plan')
-            ->latest('id')
-            ->first();
+        $subscription = auth('employer')->user()->currentSubscription()?->load('plan');
 
         return view('employer.plans.index', compact('plans', 'subscription'));
     }
 
     public function checkout(Plan $plan): View|RedirectResponse
     {
-        if (! $plan->is_active || $plan->is_expired || ! $plan->domains()->where('domains.id', current_domain_id())->exists()) {
+        if (! $plan->is_active || $plan->is_expired) {
             return redirect()
                 ->route('employer.plans.index')
                 ->with('error', 'This plan is no longer available.');
@@ -48,7 +42,7 @@ class PlanController extends Controller
 
     public function purchase(PurchasePlanRequest $request, Plan $plan, PlanPurchaseService $purchases): RedirectResponse|View
     {
-        if (! $plan->is_active || $plan->is_expired || ! $plan->domains()->where('domains.id', current_domain_id())->exists()) {
+        if (! $plan->is_active || $plan->is_expired) {
             return redirect()
                 ->route('employer.plans.index')
                 ->with('error', 'This plan is no longer available.');

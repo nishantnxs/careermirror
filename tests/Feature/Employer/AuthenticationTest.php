@@ -14,14 +14,20 @@ class AuthenticationTest extends TestCase
     {
         $this->get('/employer/login')
             ->assertOk()
-            ->assertSee('Sign in');
+            ->assertSee('Welcome back')
+            ->assertSee('Sign in')
+            ->assertSee('hiring', false)
+            ->assertSee('Create an account');
     }
 
     public function test_register_screen_can_be_rendered(): void
     {
         $this->get('/employer/register')
             ->assertOk()
-            ->assertSee('Create an account');
+            ->assertSee('Create your account')
+            ->assertSee('hiring', false)
+            ->assertSee('Company name')
+            ->assertSee('Phone');
     }
 
     public function test_employer_can_register_and_is_stored_in_the_employers_table(): void
@@ -39,6 +45,7 @@ class AuthenticationTest extends TestCase
             'name' => 'Alex Hiring',
             'company_name' => 'Acme Staffing',
             'email' => 'alex@acme.test',
+            'phone' => '9876543210',
         ]);
 
         $this->assertDatabaseMissing('candidates', [
@@ -129,6 +136,7 @@ class AuthenticationTest extends TestCase
         $this->actingAs($employer, 'employer')
             ->get('/employer')
             ->assertOk()
-            ->assertSee('Acme Staffing');
+            ->assertSee('Welcome back, Alex')
+            ->assertSee("Here's how your hiring is going.", false);
     }
 }

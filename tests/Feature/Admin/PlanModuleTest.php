@@ -50,7 +50,10 @@ class PlanModuleTest extends TestCase
     {
         Plan::factory()->count(3)->create();
 
-        $this->actingAs($this->admin, 'admin')->get('/admin/plans')->assertOk();
+        $this->actingAs($this->admin, 'admin')
+            ->get('/admin/plans')
+            ->assertOk()
+            ->assertDontSee('id="adminDomainContext"', false);
         $this->actingAs($this->admin, 'admin')->get('/admin/plans/create')->assertOk();
     }
 

@@ -40,18 +40,16 @@
             <label class="form-check-label" for="is_default">Default domain (localhost fallback)</label>
         </div>
     </div>
-    @unless ($domain->exists)
-        <div class="col-12">
-            <div class="form-check">
-                <input type="hidden" name="grant_all_employers" value="0">
-                <input type="checkbox" class="form-check-input" name="grant_all_employers" id="grant_all_employers" value="1"
-                       @checked(old('grant_all_employers', true))>
-                <label class="form-check-label" for="grant_all_employers">
-                    Allow all existing employers to publish jobs on this domain
-                </label>
-            </div>
+    <div class="col-12">
+        <div class="form-check">
+            <input type="hidden" name="grant_all_employers" value="0">
+            <input type="checkbox" class="form-check-input" name="grant_all_employers" id="grant_all_employers" value="1"
+                   @checked(old('grant_all_employers', ! $domain->exists))>
+            <label class="form-check-label" for="grant_all_employers">
+                Allow all existing employers to publish jobs on this domain
+            </label>
         </div>
-    @endunless
+    </div>
     <div class="col-md-6">
         <label for="seo_title" class="form-label">SEO title</label>
         <input type="text" name="seo_title" id="seo_title" class="form-control"

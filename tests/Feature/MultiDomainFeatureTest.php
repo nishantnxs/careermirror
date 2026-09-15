@@ -16,7 +16,7 @@ class MultiDomainFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_plans_are_filtered_by_current_domain_for_employers(): void
+    public function test_employers_see_all_plans_regardless_of_login_website(): void
     {
         $domainA = Domain::query()->where('is_default', true)->firstOrFail();
         $domainB = Domain::factory()->create(['host' => 'portal-b.test', 'url' => 'https://portal-b.test']);
@@ -34,7 +34,12 @@ class MultiDomainFeatureTest extends TestCase
             ->get('/employer/plans')
             ->assertOk()
             ->assertSee('Plan A Only')
-            ->assertDontSee('Plan B Only');
+            ->assertSee('Plan B Only');
+
+        $this->actingAs($employer, 'employer')
+            ->get('/employer/plans/'.$planB->id.'/checkout')
+            ->assertOk()
+            ->assertSee('Plan B Only');
     }
 
     public function test_job_domains_sync_and_settings_are_isolated(): void
@@ -88,7 +93,7 @@ class MultiDomainFeatureTest extends TestCase
         $this->assertTrue(JobPosting::query()->forDomain($domainB)->whereKey($job->id)->exists());
     }
 
-    public function test_employer_cannot_assign_unauthorized_domain_to_job(): void
+    public function test_employer_can_post_a_job_to_any_active_domain(): void
     {
         $domainA = Domain::query()->where('is_default', true)->firstOrFail();
         $domainB = Domain::factory()->create(['host' => 'portal-b.test', 'url' => 'https://portal-b.test']);
@@ -106,18 +111,54 @@ class MultiDomainFeatureTest extends TestCase
 
         $this->actingAs($employer, 'employer')
             ->post('/employer/jobs', [
-                'title' => 'Blocked Domain Job',
-                'description' => 'Should fail',
+                'title' => 'Cross Domain Job',
+                'description' => 'Posted to another website',
                 'currency' => 'INR',
                 'status' => 'published',
                 'category_selection' => 'listed',
                 'category_id' => $category->id,
                 'domain_ids' => [$domainB->id],
             ])
+            ->assertRedirect('/employer/jobs');
+
+        $job = JobPosting::firstWhere('title', 'Cross Domain Job');
+
+        $this->assertNotNull($job);
+        $this->assertTrue($job->domains()->whereKey($domainB->id)->exists());
+    }
+
+    public function test_employer_cannot_post_a_job_to_an_inactive_domain(): void
+    {
+        $domainA = Domain::query()->where('is_default', true)->firstOrFail();
+        $inactive = Domain::factory()->inactive()->create([
+            'host' => 'inactive.test',
+            'url' => 'https://inactive.test',
+        ]);
+
+        $employer = Employer::factory()->create();
+
+        $plan = Plan::factory()->create(['jobs_allowed' => 1, 'amount' => 0, 'plan_type' => 'free']);
+        $plan->domains()->sync([$domainA->id]);
+
+        $this->actingAs($employer, 'employer')
+            ->post("/employer/plans/{$plan->id}/purchase");
+
+        $category = Category::factory()->create();
+
+        $this->actingAs($employer, 'employer')
+            ->post('/employer/jobs', [
+                'title' => 'Inactive Domain Job',
+                'description' => 'Should fail',
+                'currency' => 'INR',
+                'status' => 'published',
+                'category_selection' => 'listed',
+                'category_id' => $category->id,
+                'domain_ids' => [$inactive->id],
+            ])
             ->assertSessionHasErrors('domain_ids');
     }
 
-    public function test_job_form_lists_only_employer_allowed_domains(): void
+    public function test_job_form_lists_all_active_domains(): void
     {
         $domainA = Domain::query()->where('is_default', true)->firstOrFail();
         $domainB = Domain::factory()->create([
@@ -132,7 +173,7 @@ class MultiDomainFeatureTest extends TestCase
         ]);
 
         $employer = Employer::factory()->create();
-        $employer->domains()->sync([$domainA->id, $domainB->id]);
+        $employer->domains()->sync([$domainA->id]);
 
         $plan = Plan::factory()->create(['jobs_allowed' => 1, 'amount' => 0, 'plan_type' => 'free']);
         $plan->domains()->sync([$domainA->id]);
@@ -145,7 +186,7 @@ class MultiDomainFeatureTest extends TestCase
             ->assertOk()
             ->assertSee($domainA->host)
             ->assertSee('portal-b.test')
-            ->assertDontSee('portal-c.test');
+            ->assertSee('portal-c.test');
     }
 
     public function test_new_domain_can_be_granted_to_all_employers(): void
@@ -169,5 +210,61 @@ class MultiDomainFeatureTest extends TestCase
 
         $this->assertNotNull($domain);
         $this->assertTrue($employer->domains()->whereKey($domain->id)->exists());
+    }
+
+    public function test_employer_registration_grants_all_active_domains(): void
+    {
+        $domainA = Domain::query()->where('is_default', true)->firstOrFail();
+        $domainB = Domain::factory()->create([
+            'host' => 'portal-b.test',
+            'url' => 'https://portal-b.test',
+            'status' => 'active',
+        ]);
+
+        $this->post('/employer/register', [
+            'name' => 'Alex Hiring',
+            'company_name' => 'Acme Staffing',
+            'email' => 'alex@acme.test',
+            'phone' => '9876543210',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertRedirect('/employer');
+
+        $employer = Employer::query()->where('email', 'alex@acme.test')->first();
+
+        $this->assertNotNull($employer);
+        $this->assertEqualsCanonicalizing(
+            [$domainA->id, $domainB->id],
+            $employer->domains()->pluck('domains.id')->map(fn ($id) => (int) $id)->all()
+        );
+    }
+
+    public function test_updating_a_domain_can_grant_it_to_existing_employers(): void
+    {
+        $employer = Employer::factory()->create();
+        $admin = Admin::factory()->create();
+        $domain = Domain::factory()->create([
+            'host' => 'portal-b.test',
+            'url' => 'https://portal-b.test',
+            'name' => 'Portal B',
+            'website_name' => 'Portal B',
+            'status' => 'active',
+        ]);
+
+        $this->assertFalse($employer->domains()->whereKey($domain->id)->exists());
+
+        $this->actingAs($admin, 'admin')
+            ->put('/admin/domains/'.$domain->id, [
+                'name' => $domain->name,
+                'host' => $domain->host,
+                'url' => $domain->url,
+                'website_name' => $domain->website_name,
+                'status' => 'active',
+                'is_default' => '0',
+                'grant_all_employers' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->assertTrue($employer->fresh()->domains()->whereKey($domain->id)->exists());
     }
 }

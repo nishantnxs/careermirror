@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\JobStatus;
 use Database\Factories\JobPostingFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JobPosting extends Model
 {
@@ -62,7 +64,17 @@ class JobPosting extends Model
         return $this->belongsToMany(Domain::class, 'domain_job_posting')->withTimestamps();
     }
 
-    public function scopeForDomain($query, Domain|int|null $domain)
+    public function applications(): HasMany
+    {
+        return $this->hasMany(JobApplication::class);
+    }
+
+    public function savedByCandidates(): HasMany
+    {
+        return $this->hasMany(SavedJob::class);
+    }
+
+    public function scopeForDomain(Builder $query, Domain|int|null $domain): Builder
     {
         if ($domain === null) {
             return $query;
@@ -70,6 +82,44 @@ class JobPosting extends Model
 
         $domainId = $domain instanceof Domain ? $domain->id : $domain;
 
-        return $query->whereHas('domains', fn ($query) => $query->where('domains.id', $domainId));
+        return $query->whereHas('domains', fn (Builder $query) => $query->where('domains.id', $domainId));
+    }
+
+    public function scopeAvailable(Builder $query): Builder
+    {
+        return $query
+            ->where('status', JobStatus::Published)
+            ->where(function (Builder $query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>=', now());
+            });
+    }
+
+    public function isAvailable(): bool
+    {
+        if ($this->status !== JobStatus::Published) {
+            return false;
+        }
+
+        return $this->expires_at === null || $this->expires_at->isFuture() || $this->expires_at->isCurrentSecond();
+    }
+
+    public function salaryLabel(): string
+    {
+        if ($this->salary_min === null && $this->salary_max === null) {
+            return 'Not disclosed';
+        }
+
+        $currency = $this->currency ?: 'INR';
+
+        if ($this->salary_min !== null && $this->salary_max !== null) {
+            return sprintf('%s %s – %s', $currency, number_format((float) $this->salary_min), number_format((float) $this->salary_max));
+        }
+
+        if ($this->salary_min !== null) {
+            return sprintf('%s %s+', $currency, number_format((float) $this->salary_min));
+        }
+
+        return sprintf('Up to %s %s', $currency, number_format((float) $this->salary_max));
     }
 }

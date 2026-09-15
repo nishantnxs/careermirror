@@ -46,7 +46,12 @@ class Admin extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return (bool) $this->is_super_admin;
+        if ((bool) $this->is_super_admin) {
+            return true;
+        }
+
+        // Pre-RBAC full admins have no moderator role assigned.
+        return $this->admin_role_id === null;
     }
 
     public function hasPermission(string $permission): bool

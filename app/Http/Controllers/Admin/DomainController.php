@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DomainRequest;
 use App\Http\Requests\Admin\WebsiteSettingRequest;
 use App\Models\Domain;
-use App\Models\Employer;
 use App\Models\Setting;
 use App\Services\ActivityLogger;
 use App\Services\DomainService;
@@ -68,11 +67,8 @@ class DomainController extends Controller
         $this->storeUploads($request, $domain);
         $this->seedSettingsFromDefault($domain);
 
-        if ($request->boolean('grant_all_employers')) {
-            $employerIds = Employer::query()->pluck('id')->all();
-            if ($employerIds !== []) {
-                $domain->employers()->syncWithoutDetaching($employerIds);
-            }
+        if ($request->boolean('grant_all_employers') && $domain->isActive()) {
+            $domain->grantToAllEmployers();
         }
 
         $this->activity->record(
@@ -110,6 +106,10 @@ class DomainController extends Controller
         $domain->update($data);
         $this->storeUploads($request, $domain);
         $domain = $domain->fresh();
+
+        if ($request->boolean('grant_all_employers') && $domain->isActive()) {
+            $domain->grantToAllEmployers();
+        }
 
         [$old, $new] = $this->activity->diff($before, $domain->only(['name', 'host', 'url', 'website_name', 'status', 'is_default']));
 

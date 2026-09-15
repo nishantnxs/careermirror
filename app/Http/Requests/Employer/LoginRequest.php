@@ -28,4 +28,9 @@ class LoginRequest extends FormRequest
     {
         return 'employer';
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return route('employer.login');
+    }
 }

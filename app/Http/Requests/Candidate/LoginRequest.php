@@ -28,4 +28,9 @@ class LoginRequest extends FormRequest
     {
         return 'candidate';
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return route('candidate.login');
+    }
 }

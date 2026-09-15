@@ -58,6 +58,15 @@ class Domain extends Model
         return $this->belongsToMany(Employer::class, 'domain_employer')->withTimestamps();
     }
 
+    public function grantToAllEmployers(): void
+    {
+        $employerIds = Employer::query()->pluck('id')->all();
+
+        if ($employerIds !== []) {
+            $this->employers()->syncWithoutDetaching($employerIds);
+        }
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', DomainStatus::Active);

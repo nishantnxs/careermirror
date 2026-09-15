@@ -1,30 +1,32 @@
-@extends('layouts.portal')
+@extends('layouts.marketing')
 
 @section('title', 'Complete payment')
-@section('account_label', auth('employer')->user()->company_name)
-@section('logout_action', route('employer.logout'))
-
-@section('nav')
-    @include('employer.partials.nav', ['active' => 'plans'])
-@endsection
 
 @section('content')
-    <div class="card">
-        <div class="card-body p-4 text-center">
-            <h1 class="h4 fw-semibold mb-2">Complete your payment</h1>
-            <p class="text-secondary mb-1">{{ $plan->title }} &middot; {{ $order->formatted_final_amount }}</p>
-            <p class="text-secondary small mb-4">Order {{ $order->order_number }}</p>
+<section class="employer-panel">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-6">
+                <div class="panel-card">
+                    <div class="panel-card-body p-4 text-center">
+                        <h1 class="panel-title mb-2">Complete your payment</h1>
+                        <p class="panel-subtitle mb-1">{{ $plan->title }} · {{ $order->formatted_final_amount }}</p>
+                        <p class="text-secondary small mb-4">Order {{ $order->order_number }}</p>
 
-            @if (($checkout->payload['gateway'] ?? '') === 'razorpay')
-                <button type="button" id="payWithRazorpay" class="btn btn-brand btn-lg">
-                    Pay now
-                </button>
-                <p class="text-secondary small mt-3 mb-0">You will be redirected to Razorpay to finish payment securely.</p>
-            @else
-                <p class="text-secondary mb-0">Preparing payment…</p>
-            @endif
+                        @if (($checkout->payload['gateway'] ?? '') === 'razorpay')
+                            <button type="button" id="payWithRazorpay" class="btn btn-primary btn-lg">
+                                Pay now
+                            </button>
+                            <p class="text-secondary small mt-3 mb-0">You will be redirected to Razorpay to finish payment securely.</p>
+                        @else
+                            <p class="panel-subtitle mb-0">Preparing payment…</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</section>
 @endsection
 
 @if (($checkout->payload['gateway'] ?? '') === 'razorpay')

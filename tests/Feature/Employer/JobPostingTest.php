@@ -3,6 +3,7 @@
 namespace Tests\Feature\Employer;
 
 use App\Enums\JobStatus;
+use App\Enums\PlanType;
 use App\Enums\SubscriptionStatus;
 use App\Models\Category;
 use App\Models\Domain;
@@ -122,6 +123,60 @@ class JobPostingTest extends TestCase
 
         $this->assertSame(1, JobPosting::count());
         $this->assertSame(1, $subscription->fresh()->jobs_used);
+    }
+
+    public function test_employer_can_post_one_job_per_purchased_plan_credit(): void
+    {
+        config(['payments.driver' => 'fake']);
+
+        $free = Plan::factory()->free()->create(['jobs_allowed' => 1]);
+        $starter = Plan::factory()->create([
+            'jobs_allowed' => 1,
+            'amount' => 399,
+            'plan_type' => PlanType::Basic,
+        ]);
+        $quarterly = Plan::factory()->create([
+            'jobs_allowed' => 1,
+            'amount' => 1299,
+            'plan_type' => PlanType::Standard,
+        ]);
+
+        $this->actingAs($this->employer, 'employer')
+            ->post("/employer/plans/{$free->id}/purchase")
+            ->assertRedirect();
+
+        $this->actingAs($this->employer, 'employer')
+            ->post('/employer/jobs', $this->jobPayload(['title' => 'Free plan job']))
+            ->assertRedirect('/employer/jobs');
+
+        foreach ([$starter, $quarterly] as $plan) {
+            $start = $this->actingAs($this->employer, 'employer')
+                ->post("/employer/plans/{$plan->id}/purchase", [
+                    'payment_mode' => 'upi',
+                ]);
+
+            $order = Order::query()->where('plan_id', $plan->id)->latest('id')->firstOrFail();
+            $start->assertRedirect(route('employer.payments.fake.complete', $order));
+
+            $this->actingAs($this->employer, 'employer')
+                ->get(route('employer.payments.fake.complete', $order))
+                ->assertRedirect();
+        }
+
+        $this->actingAs($this->employer, 'employer')
+            ->post('/employer/jobs', $this->jobPayload(['title' => 'Starter plan job']))
+            ->assertRedirect('/employer/jobs');
+
+        $this->actingAs($this->employer, 'employer')
+            ->post('/employer/jobs', $this->jobPayload(['title' => 'Quarterly plan job']))
+            ->assertRedirect('/employer/jobs');
+
+        $this->actingAs($this->employer, 'employer')
+            ->get('/employer/jobs/create')
+            ->assertRedirect('/employer/plans');
+
+        $this->assertSame(3, JobPosting::count());
+        $this->assertSame(2, EmployerSubscription::query()->where('status', 'active')->value('jobs_used'));
     }
 
     public function test_employer_can_update_and_delete_own_job(): void

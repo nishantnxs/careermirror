@@ -13,7 +13,9 @@ class LoginController extends Controller
 {
     public function create(): View
     {
-        return view('employer.auth.login');
+        return view('auth.sign-in', [
+            'activeTab' => 'employer',
+        ]);
     }
 
     public function store(LoginRequest $request): RedirectResponse

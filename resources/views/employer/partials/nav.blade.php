@@ -11,6 +11,14 @@
        href="{{ route('employer.jobs.index') }}">
         <i class="bi bi-briefcase"></i> Jobs
     </a>
+    <a class="{{ ($active ?? '') === 'applicants' ? 'active' : '' }}"
+       href="{{ route('employer.applicants.index') }}">
+        <i class="bi bi-people"></i> Applicants
+    </a>
+    <a class="{{ ($active ?? '') === 'messages' ? 'active' : '' }}"
+       href="{{ route('employer.messages.index') }}">
+        <i class="bi bi-chat-dots"></i> Messages
+    </a>
     <a class="{{ ($active ?? '') === 'orders' ? 'active' : '' }}"
        href="{{ route('employer.orders.index') }}">
         <i class="bi bi-receipt"></i> Orders

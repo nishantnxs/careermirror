@@ -6,6 +6,7 @@ use App\Enums\AccountStatus;
 use App\Models\Candidate;
 use App\Models\Domain;
 use App\Models\Employer;
+use App\Models\JobApplication;
 use App\Models\JobPosting;
 use App\Models\Plan;
 use App\Support\DateRange;
@@ -50,7 +51,15 @@ class AdminDashboardService
                 'plans_available' => (clone $plans)->count(),
                 'plans_purchased' => 0,
                 'revenue' => 0.0,
-                'applications' => 0,
+                'applications' => JobApplication::query()
+                    ->whereBetween('applied_at', [$range->start, $range->end])
+                    ->when($domainId, function (Builder $query) use ($domainId) {
+                        $query->whereHas(
+                            'jobPosting',
+                            fn (Builder $query) => $query->forDomain($domainId)
+                        );
+                    })
+                    ->count(),
                 'total_domains' => Domain::query()->count(),
                 'active_domains' => Domain::query()->active()->count(),
             ],

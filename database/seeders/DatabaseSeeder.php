@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             AdminSeeder::class,
             AdminAccessSeeder::class,
             SettingSeeder::class,
+            FreePlanSeeder::class,
             PlanSeeder::class,
             CategorySeeder::class,
         ]);

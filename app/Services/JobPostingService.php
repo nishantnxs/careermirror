@@ -28,6 +28,7 @@ class JobPostingService
             $subscription = EmployerSubscription::query()
                 ->where('employer_id', $employer->id)
                 ->active()
+                ->withRemainingCredits()
                 ->lockForUpdate()
                 ->latest('id')
                 ->first();

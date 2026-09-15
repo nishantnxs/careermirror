@@ -121,22 +121,31 @@ class GoogleAuthenticationTest extends TestCase
         $this->assertGuest('candidate');
     }
 
-    public function test_candidate_google_sign_in_rejects_employer_email(): void
+    public function test_candidate_google_sign_in_allows_an_email_already_used_by_an_employer(): void
     {
         Employer::factory()->create(['email' => 'shared@gmail.com']);
 
-        $this->fakeGoogleProfile(['email' => 'shared@gmail.com']);
+        $this->fakeGoogleProfile([
+            'id' => 'google-candidate-shared',
+            'email' => 'shared@gmail.com',
+        ]);
 
         $state = $this->googleCallbackState(
             (string) $this->get('/candidate/auth/google')->headers->get('Location')
         );
 
         $this->get('/candidate/auth/google/callback?code=test-code&state='.$state)
-            ->assertRedirect('/candidate/login')
-            ->assertSessionHasErrors('email');
+            ->assertRedirect('/candidate');
 
-        $this->assertGuest('candidate');
-        $this->assertDatabaseMissing('candidates', ['email' => 'shared@gmail.com']);
+        $this->assertAuthenticated('candidate');
+        $this->assertDatabaseHas('candidates', [
+            'email' => 'shared@gmail.com',
+            'google_id' => 'google-candidate-shared',
+        ]);
+        $this->assertDatabaseHas('employers', [
+            'email' => 'shared@gmail.com',
+        ]);
+        $this->assertGuest('employer');
     }
 
     public function test_google_callback_rejects_invalid_state(): void
@@ -201,20 +210,28 @@ class GoogleAuthenticationTest extends TestCase
         $this->assertSame('google-employer-1', $employer->fresh()->google_id);
     }
 
-    public function test_employer_google_sign_in_rejects_candidate_email(): void
+    public function test_employer_google_sign_in_allows_an_email_already_used_by_a_candidate(): void
     {
         Candidate::factory()->create(['email' => 'shared@gmail.com']);
 
-        $this->fakeGoogleProfile(['email' => 'shared@gmail.com']);
+        $this->fakeGoogleProfile([
+            'id' => 'google-employer-shared',
+            'name' => 'Alex Hiring',
+            'email' => 'shared@gmail.com',
+        ]);
 
         $state = $this->googleCallbackState(
             (string) $this->get('/employer/auth/google')->headers->get('Location')
         );
 
         $this->get('/employer/auth/google/callback?code=test-code&state='.$state)
-            ->assertRedirect('/employer/login')
-            ->assertSessionHasErrors('email');
+            ->assertRedirect('/employer');
 
-        $this->assertGuest('employer');
+        $this->assertAuthenticated('employer');
+        $this->assertDatabaseHas('employers', [
+            'email' => 'shared@gmail.com',
+            'google_id' => 'google-employer-shared',
+        ]);
+        $this->assertGuest('candidate');
     }
 }

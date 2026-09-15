@@ -21,6 +21,7 @@ class HomeController extends Controller
 
         $categories = Category::query()
             ->approved()
+            ->withAvailableJobs()
             ->ordered()
             ->limit(12)
             ->get();

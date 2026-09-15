@@ -12,6 +12,10 @@
             <h1 class="panel-title mt-2">{{ $plan->isFree() ? 'Activate free plan' : 'Secure checkout' }}</h1>
             <p class="panel-subtitle">
                 {{ $plan->title }} · {{ $plan->formatted_amount }}
+                @if ($plan->discount_percent)
+                    <s class="text-secondary ms-1">{{ $plan->currencySymbol() }}{{ number_format((float) $plan->amount, 2) }}</s>
+                    <span class="badge bg-success-subtle text-success-emphasis ms-1">Save {{ $plan->discount_percent }}%</span>
+                @endif
                 @if (! $plan->isFree() && config('payments.razorpay.mode') === 'test')
                     <span class="badge bg-warning-subtle text-warning-emphasis ms-1">Razorpay test mode</span>
                 @endif
@@ -24,6 +28,14 @@
                     <div class="panel-card-header">Plan summary</div>
                     <div class="panel-card-body">
                         <dl class="row mb-0 small">
+                            @if ($plan->discount_percent)
+                                <dt class="col-5 text-secondary fw-normal">Original price</dt>
+                                <dd class="col-7">
+                                    <s class="text-secondary">{{ $plan->currencySymbol() }}{{ number_format((float) $plan->amount, 2) }}</s>
+                                </dd>
+                                <dt class="col-5 text-secondary fw-normal">Discount</dt>
+                                <dd class="col-7 text-success">Save {{ $plan->discount_percent }}%</dd>
+                            @endif
                             <dt class="col-5 text-secondary fw-normal">Amount</dt>
                             <dd class="col-7 fw-semibold">{{ $plan->formatted_amount }}</dd>
                             <dt class="col-5 text-secondary fw-normal">Jobs allowed</dt>

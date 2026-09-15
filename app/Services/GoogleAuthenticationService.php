@@ -124,12 +124,6 @@ class GoogleAuthenticationService
      */
     public function resolveCandidate(GoogleUserProfile $profile): array
     {
-        if (Employer::query()->where('email', $profile->email)->exists()) {
-            throw ValidationException::withMessages([
-                'email' => 'This email is already registered as an employer. Sign in from the hiring tab.',
-            ]);
-        }
-
         $candidate = Candidate::query()->where('google_id', $profile->id)->first()
             ?? Candidate::query()->where('email', $profile->email)->first();
 
@@ -160,12 +154,6 @@ class GoogleAuthenticationService
      */
     public function resolveEmployer(GoogleUserProfile $profile): array
     {
-        if (Candidate::query()->where('email', $profile->email)->exists()) {
-            throw ValidationException::withMessages([
-                'email' => 'This email is already registered as a candidate. Sign in from the candidate tab.',
-            ]);
-        }
-
         $employer = Employer::query()->where('google_id', $profile->id)->first()
             ?? Employer::query()->where('email', $profile->email)->first();
 

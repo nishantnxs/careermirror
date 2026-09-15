@@ -112,18 +112,16 @@
     </div>
 </section>
 
+@if ($categories->isNotEmpty())
 <section class="popular-categories">
     <div class="container">
         <h2 class="mb-4">Popular categories</h2>
         <div class="category-list d-flex flex-wrap gap-2">
-            @forelse ($categories as $category)
+            @foreach ($categories as $category)
                 <a href="{{ route('jobs.index', ['category_id' => $category->id]) }}" class="category-tag">{{ $category->name }}</a>
-            @empty
-                @foreach (['Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'Customer Support', 'Finance', 'Healthcare', 'Skilled Trades', 'Education', 'Operations', 'Other'] as $name)
-                    <a href="{{ route('jobs.index', ['keyword' => $name]) }}" class="category-tag">{{ $name }}</a>
-                @endforeach
-            @endforelse
+            @endforeach
         </div>
     </div>
 </section>
+@endif
 @endsection

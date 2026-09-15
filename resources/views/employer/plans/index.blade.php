@@ -18,13 +18,16 @@
         };
     };
 
-    $priceHtml = function (\App\Models\Plan $plan) use ($periodLabel): string {
+    $formatMoney = function (\App\Models\Plan $plan, float $amount): string {
+        return $plan->currencySymbol().number_format($amount, fmod($amount, 1.0) === 0.0 ? 0 : 2);
+    };
+
+    $priceHtml = function (\App\Models\Plan $plan) use ($periodLabel, $formatMoney): string {
         if ($plan->isFree()) {
             return 'Free';
         }
 
-        $amount = (float) $plan->payable_amount;
-        $formatted = $plan->currencySymbol().number_format($amount, fmod($amount, 1.0) === 0.0 ? 0 : 2);
+        $formatted = $formatMoney($plan, (float) $plan->payable_amount);
         $period = $periodLabel($plan);
 
         return $period
@@ -72,7 +75,15 @@
                         @endif
 
                         <h3 class="plan-name">{{ $plan->title }}</h3>
-                        <div class="plan-price">{!! $priceHtml($plan) !!}</div>
+                        <div class="plan-price-block">
+                            <div class="plan-price">{!! $priceHtml($plan) !!}</div>
+                            @if ($plan->discount_percent)
+                                <div class="plan-price-compare">
+                                    <s class="plan-price-original">{{ $formatMoney($plan, (float) $plan->amount) }}</s>
+                                    <span class="plan-save-badge">Save {{ $plan->discount_percent }}%</span>
+                                </div>
+                            @endif
+                        </div>
                         <p class="plan-description">
                             {{ $plan->description ?: 'Up to '.$plan->jobs_allowed.' active job post'.($plan->jobs_allowed === 1 ? '' : 's') }}
                         </p>

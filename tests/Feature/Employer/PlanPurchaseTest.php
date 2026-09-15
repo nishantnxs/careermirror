@@ -43,6 +43,60 @@ class PlanPurchaseTest extends TestCase
             ->assertDontSee('Hidden');
     }
 
+    public function test_plans_page_shows_original_and_discounted_prices(): void
+    {
+        Plan::factory()->create([
+            'title' => 'Professional Quarterly',
+            'amount' => 1299,
+            'discount_amount' => 1199,
+            'plan_type' => PlanType::Basic,
+        ]);
+
+        $this->actingAs($this->employer, 'employer')
+            ->get('/employer/plans')
+            ->assertOk()
+            ->assertSee('Professional Quarterly')
+            ->assertSee('₹1,199')
+            ->assertSee('₹1,299')
+            ->assertSee('Save 8%')
+            ->assertSee('plan-price-original', false);
+    }
+
+    public function test_plans_page_hides_compare_price_when_there_is_no_discount(): void
+    {
+        Plan::factory()->create([
+            'title' => 'Growth Paid',
+            'amount' => 999,
+            'discount_amount' => null,
+            'plan_type' => PlanType::Basic,
+        ]);
+
+        $this->actingAs($this->employer, 'employer')
+            ->get('/employer/plans')
+            ->assertOk()
+            ->assertSee('₹999')
+            ->assertDontSee('plan-price-original', false)
+            ->assertDontSee('plan-save-badge', false);
+    }
+
+    public function test_checkout_shows_original_and_discounted_prices(): void
+    {
+        $plan = Plan::factory()->create([
+            'title' => 'Professional Quarterly',
+            'amount' => 1299,
+            'discount_amount' => 1199,
+            'plan_type' => PlanType::Basic,
+        ]);
+
+        $this->actingAs($this->employer, 'employer')
+            ->get("/employer/plans/{$plan->id}/checkout")
+            ->assertOk()
+            ->assertSee('Original price')
+            ->assertSee('₹1,299.00')
+            ->assertSee('₹1,199.00')
+            ->assertSee('Save 8%');
+    }
+
     public function test_checkout_shows_gateway_payment_methods(): void
     {
         $plan = Plan::factory()->create([

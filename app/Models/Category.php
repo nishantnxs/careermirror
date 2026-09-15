@@ -74,6 +74,16 @@ class Category extends Model
         return $this->hasMany(JobPosting::class);
     }
 
+    /**
+     * Limit to categories that currently have a public job on the given domain.
+     */
+    public function scopeWithAvailableJobs(Builder $query, Domain|int|null $domain = null): Builder
+    {
+        return $query->whereHas('jobPostings', function (Builder $query) use ($domain) {
+            $query->available()->forDomain($domain ?? current_domain());
+        });
+    }
+
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
         return $query->when($term, function (Builder $query) use ($term) {
